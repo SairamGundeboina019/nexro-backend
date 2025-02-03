@@ -5,6 +5,7 @@ require('dotenv').config(); // Load enviornment variables;
 const { Pool } = require('pg'); // Correctly import Pool
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const { body, validationResult } = require('express-validator'); //Import express=validator
 
 
 // Initialize app
@@ -89,7 +90,7 @@ app.post('/login', async (req, res) => {
   }
 });
 
-  //Protected Route Example
+  //Middleware Protected Route Example
 const authenticateToken = (req, res, next) => {
   const token = req.header('Authorization')?.split(' ')[1];
   if (!token) {
@@ -104,6 +105,60 @@ const authenticateToken = (req, res, next) => {
   }
 };
 
+
+// Get User Profile (Protected)
+app.get('/profile', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const result = await pool.query('SELECT id, email, name, created_at FROM users WHERE id = $1', [userId]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to fetch user profile' });
+  }
+});
+
+// Update User Profile
+app.put('/profile', 
+  authenticateToken,
+   body('name').isLength({ min: 3 }).withMessage('Name must be at least 3 characters long'), 
+   async (req, res) => {
+    // Validate request 
+    
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+
+  const userId = req.user.userId;
+  const { name } = req.body;
+
+  try {
+    const result = await pool.query(
+      'UPDATE users SET name = $1 WHERE id = $2 RETURNING id, email, name, created_at',
+      [name, userId]
+    );
+
+    if (result.rows.length == 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json({ message: 'Profile updated successfully', profile: result.rows[0] });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to update profile' });
+  }
+});
+
+
+
+// Protected Route Example
 app.get('/protected', authenticateToken, (req, res) => {
   res.json({ message: 'This is a protected route', userId: req.user.userId});
 });
