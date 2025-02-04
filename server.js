@@ -4,6 +4,7 @@ const cors = require('cors');
 require('dotenv').config();
 const pool = require('./db'); //Database connection
 const userRoutes = require('./routes/userRoutes'); //  Import user routes
+const problemRoutes = require('./routes/problemRoutes');
 const { body } = require('express-validator');
 
 
@@ -22,6 +23,8 @@ app.get('/', (req, res) => {
 
 //USER ROUTES
 app.use('/api/users', userRoutes);
+app.use('/api/problems', problemRoutes);
+
 
 
 if (process.env.NODE_ENV !== 'test') { 
