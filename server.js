@@ -5,6 +5,7 @@ require('dotenv').config();
 const pool = require('./db'); //Database connection
 const userRoutes = require('./routes/userRoutes'); //  Import user routes
 const problemRoutes = require('./routes/problemRoutes');
+const solutionRoutes = require('./routes/solutionRoutes');
 const { body } = require('express-validator');
 
 
@@ -24,6 +25,7 @@ app.get('/', (req, res) => {
 //USER ROUTES
 app.use('/api/users', userRoutes);
 app.use('/api/problems', problemRoutes);
+app.use('/api/solutions', solutionRoutes);
 
 
 
