@@ -6,7 +6,10 @@ const pool = require('./db'); //Database connection
 const userRoutes = require('./routes/userRoutes'); //  Import user routes
 const problemRoutes = require('./routes/problemRoutes');
 const solutionRoutes = require('./routes/solutionRoutes');
+const boutyRoutes = require('./routes/bountyRoutes');
 const { body } = require('express-validator');
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+
 
 
 const app = express();
@@ -26,7 +29,7 @@ app.get('/', (req, res) => {
 app.use('/api/users', userRoutes);
 app.use('/api/problems', problemRoutes);
 app.use('/api/solutions', solutionRoutes);
-
+app.use('/api/bounties', boutyRoutes);
 
 
 if (process.env.NODE_ENV !== 'test') { 

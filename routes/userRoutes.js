@@ -3,7 +3,8 @@ const { body, validationResult } = require('express-validator');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const pool = require('../db');
-const authenticateToken = require('../middlewares/authMiddleware');
+const authenticateToken = require('../utils/auth');
+const stripe = require('../utils/stripe');
 
 const router = express.Router();
 
@@ -145,5 +146,52 @@ router.put(
     }
   }
 );
+
+/**
+ * STRIPE CONNECT: solvers can link their stripe account
+ */
+router.post('/connect-stripe', authenticateToken, async (req, res) => {
+  try {
+    //Create stripe account for solver
+    const account = await stripe.accounts.create({
+      type: 'express',
+      counry: 'US',
+      email: req.user.email,
+      capabilities: {
+        transfers: { requested: true },
+      },
+    });
+
+
+    //Store stripe account ID in DB
+    await pool.query('UPDATE users SET stripe_account_id = $1 WHERE id = $2', [account.id, req.user.userId]);
+
+    res.json({ message: 'Stripe account created successfully', stripeAccountId: account.id });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to connect stripe account' });
+  }
+});
+
+/**
+ * GET STRIPE ACCOUNT STATUS
+ */
+router.get('/stripe-status', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const result = await pool.query('SELECT stripe_account_id FROM users WHERE id = $1', [userId]);
+
+    if (result.rows.length === 0 || !result.rows[0].stripe_account_id) {
+      return res.status(400).json({ error: 'Stripe account not created' });
+    }
+
+    const account = await stripe.accounts.retrieve(result.rows[0].stripe_account_id);
+    res.json({ stripeAccount: account });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to fetch Stripe status' });
+  }
+});
+
 
 module.exports = router;
