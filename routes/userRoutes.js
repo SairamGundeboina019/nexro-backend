@@ -34,13 +34,16 @@ router.post(
       const hashedPassword = await bcrypt.hash(password, 10);
       console.log('Storing Hashed Password:', hashedPassword); // Debugging
 
-      // Insert into database
+      // Insert user into database with an initial balance of 100 points
       const result = await pool.query(
-        'INSERT INTO users (email, password_hash, name) VALUES ($1, $2, $3) RETURNING id',
-        [email, hashedPassword, name]
+        'INSERT INTO users (email, password_hash, name, balance) VALUES ($1, $2, $3, $4) RETURNING id',
+        [email, hashedPassword, name, 1000] // 1000 is the starting balance
       );
 
-      res.status(201).json({ message: 'User registered successfully', userId: result.rows[0].id });
+      res.status(201).json({ message: 'User registered successfully', userId: result.rows[0].id,
+      balance: result.rows[0].balance
+    });
+
     } catch (error) {
       console.error(error);
       res.status(500).json({ error: 'Failed to register user' });
@@ -115,6 +118,33 @@ router.get('/profile', authenticateToken, async (req, res) => {
   }
 });
 
+/**
+ * GET /api/users/balance - Get user balance
+ */
+router.get('/balance', authenticateToken, async (req, res) => {
+  try {
+      // ✅ Ensure we correctly extract the user ID from the token
+      const userId = req.user.userId;
+
+      if (!userId) {
+          return res.status(401).json({ error: 'Unauthorized: User ID missing' });
+      }
+
+      // ✅ Correct SQL query
+      const result = await pool.query('SELECT balance FROM users WHERE id = $1', [userId]);
+
+      if (result.rows.length === 0) {
+          return res.status(404).json({ error: 'User not found' });
+      }
+
+      res.json({ balance: result.rows[0].balance });
+  } catch (error) {
+      console.error('Database Error:', error);
+      res.status(500).json({ error: 'Failed to fetch balance' });
+  }
+});
+
+
 // UPDATE USER PROFILE
 router.put(
   '/profile',
@@ -148,50 +178,18 @@ router.put(
 );
 
 /**
- * STRIPE CONNECT: solvers can link their stripe account
+ * GET /api/users/balance - Get user balance
  */
-router.post('/connect-stripe', authenticateToken, async (req, res) => {
+router.get('/balance', authenticateToken, async (req, res) => {
   try {
-    //Create stripe account for solver
-    const account = await stripe.accounts.create({
-      type: 'express',
-      counry: 'US',
-      email: req.user.email,
-      capabilities: {
-        transfers: { requested: true },
-      },
-    });
-
-
-    //Store stripe account ID in DB
-    await pool.query('UPDATE users SET stripe_account_id = $1 WHERE id = $2', [account.id, req.user.userId]);
-
-    res.json({ message: 'Stripe account created successfully', stripeAccountId: account.id });
+      const result = await pool.query('SELECT balance FROM users WHERE id = $1', [req.user.userId]);
+      res.json({ balance: result.rows[0].balance });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Failed to connect stripe account' });
+      console.error(error);
+      res.status(500).json({ error: 'Failed to fetch balance' });
   }
 });
 
-/**
- * GET STRIPE ACCOUNT STATUS
- */
-router.get('/stripe-status', authenticateToken, async (req, res) => {
-  try {
-    const userId = req.user.userId;
-    const result = await pool.query('SELECT stripe_account_id FROM users WHERE id = $1', [userId]);
-
-    if (result.rows.length === 0 || !result.rows[0].stripe_account_id) {
-      return res.status(400).json({ error: 'Stripe account not created' });
-    }
-
-    const account = await stripe.accounts.retrieve(result.rows[0].stripe_account_id);
-    res.json({ stripeAccount: account });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Failed to fetch Stripe status' });
-  }
-});
 
 
 module.exports = router;

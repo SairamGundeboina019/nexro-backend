@@ -15,6 +15,8 @@ router.post(
   [
     body('title').notEmpty().withMessage('Title is required'),
     body('description').notEmpty().withMessage('Description is required'),
+    body('bounty').isInt({ min: 0 }).withMessage('Bounty must be a positive integer'),
+
   ],
   async (req, res) => {
     const errors = validationResult(req);
@@ -22,13 +24,27 @@ router.post(
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const { title, description, location } = req.body;
+    const { title, description, location, bounty } = req.body;
     const userId = req.user.userId;
 
     try {
+      // Check if user has enough balance
+      const userBalanceResult = await pool.query('SELECT balance FROM users WHERE id = $1', [userId]);
+      const userBalance = userBalanceResult.rows[0].balance;
+
+      if (userBalance < bounty) {
+        return res.status(400).json({ error: 'Insufficient balance to set bounty' });
+
+      }
+
+
+      // Deduct bounty from user's balance
+      await pool.query('UPDATE users SET balance = balance - $1 WHERE id = $2', [bounty, userId]);
+
+      // Insert problem with bounty
       const result = await pool.query(
-        'INSERT INTO problems (user_id, title, description, location) VALUES ($1, $2, $3, $4) RETURNING *',
-        [userId, title, description, location]
+        'INSERT INTO problems (user_id, title, description, location, bounty) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+        [userId, title, description, location, bounty]
       );
 
       res.status(201).json({ message: 'Problem posted successfully', problems: result.rows[0] });
