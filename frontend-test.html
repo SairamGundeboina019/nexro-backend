@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Socket.io Test</title>
+    <script src="https://cdn.socket.io/4.5.0/socket.io.min.js"></script>
+  </head>
+  <body>
+    <h2>Socket.io Real-Time Notification Test</h2>
+    <p><strong>Status:</strong> <span id="status">Connecting...</span></p>
+    <ul id="notifications"></ul>
+    <script>
+      const socket = io("http://localhost:5000");
+
+      socket.on("connect", () => {
+        document.getElementById("status").innerText = "Connected!";
+        console.log("🟢 Connected to WebSocket Server!");
+      });
+
+      socket.on("connect_error", (err) => {
+        console.log("❌ WebSocket Connection Error:", err);
+        document.getElementById("status").innerText = "Connection Failed!";
+      });
+
+      function registerUser(userId) {
+        socket.emit("registerUser", userId);
+        console.log(`📢 Registering user with Socket.io: ${userId}`);
+      }
+
+      socket.on("newSolution", (data) => {
+        console.log("🔔 New Solution Notification Received:", data);
+        const li = document.createElement("li");
+        li.innerText = `New solution submitted for problem ${data.problem_id}`;
+        document.getElementById("notifications").appendChild(li);
+      });
+
+      socket.on("bountyAwarded", (data) => {
+        console.log("🏆 Bounty Awarded Notification Received:", data);
+        const li = document.createElement("li");
+        li.innerText = `You won a bounty of ${data.bounty} points for solving problem ${data.problem_id}`;
+        document.getElementById("notifications").appendChild(li);
+      });
+
+      // Register the user with their correct ID
+      setTimeout(() => registerUser(40), 2000);
+    </script>
+  </body>
+</html>
